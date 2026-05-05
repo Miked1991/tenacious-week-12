@@ -11,6 +11,17 @@
 
 ---
 
-During the evening call, the asker confirmed that the explainer fully answered every component of the question — covering the mechanism (fused kernels, prefill/decode asymmetry, KV-cache reuse), providing an experimental decomposition methodology (ablation toggles and profiling hooks), and including a working code demo.
+## Feedback raised
 
-Because the morning call had already sharpened the question to be unambiguous and the explainer was delivered with precise scope and evidence, no feedback or revision requests were raised by either partner. Both parties signed off immediately, with the asker marking the gap as "closed" and the writer making zero changes to the blog post or tweet thread.
+The original explainer covered the LoRA slowdown conceptually but lacked empirical evidence. The asker requested a concrete benchmark to ground the claims in measured data.
+
+## Changes made
+
+- Added a benchmark comparing three configurations — base model, unmerged LoRA adapter, and merged LoRA adapter — under identical generation settings.
+- Clarified that the latency penalty comes from **runtime adapter overhead** (the extra matrix multiplications per forward pass), not from a higher parameter count.
+- Expanded discussion of decode-phase sensitivity, kernel fusion, and memory-bandwidth effects.
+- Revised explainer now includes measured latency and tokens-per-second comparisons alongside a clearer explanation of why `merge_and_unload()` restores near-baseline inference performance.
+
+## Outcome
+
+Both partners signed off. The question is marked **closed**.
