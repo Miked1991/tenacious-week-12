@@ -24,7 +24,15 @@ There is no isolated "name selection stage" that happens before descriptions are
 
 ---
 
-## 2. The Model Generates the Tool Name One Token at a Time
+## 2. What Happens During the Prefill Forward Pass
+
+Before any output token is generated, the model runs a prefill pass over the entire input — user message, conversation history, and all tool definitions together. During this pass, every token in the input attends to every other token through the self-attention mechanism. The resulting key-value pairs are stored in the KV cache.
+
+This is the step that makes description strings causally upstream of the tool-name logit. By the time the prefill pass completes, the model's hidden state at every position has already been shaped by attention over the description tokens. When the model then moves to generating output, it starts from a hidden state that encodes the semantic relationship between the user's request and every tool description in the list. The tool-name token is generated from that already-conditioned state — not from a neutral starting point that reads descriptions only afterward.
+
+---
+
+## 3. The Model Generates the Tool Name One Token at a Time
 
 Transformer models are autoregressive — they produce output one token at a time. Selecting a tool looks roughly like this:
 
@@ -36,7 +44,7 @@ At every single step, the probability distribution over all possible next tokens
 
 ---
 
-## 3. Descriptions Are the Primary Driver, Not a Post-Selection Check
+## 4. Descriptions Are the Primary Driver, Not a Post-Selection Check
 
 Controlled research confirms this. The *BiasBusters* paper (ICLR 2026) found that **semantic alignment between the user query and tool metadata — especially descriptions — is the strongest driver of tool selection**. Small changes to a description can flip which tool gets chosen entirely.
 
@@ -44,7 +52,7 @@ A separate study found that **tools with well-edited descriptions receive over 1
 
 ---
 
-## 4. Why Bad Descriptions Cause Wrong Tool Calls
+## 5. Why Bad Descriptions Cause Wrong Tool Calls
 
 When descriptions are vague or missing, the model's probability distribution across tool names becomes flat or incorrectly peaked.
 
@@ -54,13 +62,19 @@ This is why Anthropic, OpenAI, and other providers explicitly recommend writing 
 
 ---
 
-## 5. Direct Answer to the Research Question
+## 6. Direct Answer to the Research Question
 
 > At the token level, when a model using function-calling selects a tool, is the description string part of the selection computation — and if so, how — or is it processed only after the tool name token is already committed?
 
 **Descriptions are part of the selection computation from the very first token.** They are not processed after the tool name is committed. Every tool definition — name, description, and parameter schema — is embedded as tokens in the input context. The model's step-by-step generation uses that full context to compute the probability of every possible next token. The tool name that gets generated is the one with the highest probability given everything in context, including the descriptions.
 
 There is no separate selection stage that runs before descriptions are considered.
+
+---
+
+## 7. A Note on Constrained Decoding
+
+Some function-calling implementations use constrained decoding — restricting the output vocabulary at generation time so the model can only produce valid tool names. This is adjacent to the main question rather than central to it. Constrained decoding controls *which tokens are allowed*, but the probability distribution that determines *which allowed token ranks highest* is still shaped by the description strings during prefill. The mechanism described above applies regardless of whether constrained decoding is in use.
 
 ---
 

@@ -7,7 +7,7 @@
 
 ## Question
 
-Our system calls Cal.com, Resend, Crunchbase, PDL, and Africa's Talking with no retry logic in place — a single timeout means permanent failure. Research and explain the following:
+The Tenacious conversion engine calls Cal.com, Resend, Crunchbase, PDL, and Africa's Talking with no retry logic in place — a single timeout means permanent, silent failure. Research and explain the following:
 
 1. What distinguishes a **transient** failure from a **permanent** API failure, and why does that distinction matter before retrying?
 2. How does **exponential backoff with jitter** work, and why does it prevent retry storms when multiple clients fail simultaneously?
