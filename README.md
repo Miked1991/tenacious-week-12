@@ -4,7 +4,7 @@
 |---|---|
 | **Program** | 10 Academy TRP1 |
 | **Week** | 12 |
-| **Dates** | May 5–6, 2026 |
+| **Dates** | May 5–7, 2026 |
 | **Participant** | Mikias Dagem |
 
 ---
@@ -84,6 +84,40 @@ Week 12 uses a structured peer-teaching format. Each day, two participants take 
 
 ---
 
+## Day 3 — SFT Eval Corruption and ORPO Gradient Mechanics
+
+| | |
+|---|---|
+| **Date** | May 7, 2026 |
+| **Partner** | Kemeriya Major |
+| **Status** | Complete ✅ |
+
+### Mikias as Asker
+
+**Question:** In `training/train.py`, the SFT script splits examples randomly at the variant level across `sft_train.jsonl` and `sft_eval.jsonl`. The actual data is built from 10 Magpie variants per probe, distributed roughly 8/2 across train and eval. This means every eval example shares the same underlying probe — same Crunchbase signals, same correct ICP segment, same required funding reference — as training examples. `model_card.md` reports a best eval loss of 0.0213 at checkpoint-441, selected via `load_best_model_at_end=True`. When you split train and eval at the variant level rather than the probe level, how does this corrupt the eval loss signal used for checkpoint selection — and what should replace it when a true held-out set already exists?
+
+**Gap closed:** A variant-level split makes eval loss measure memorization, not generalization. A model that has seen probe_42 in 8 paraphrases during training scores well on probe_42's 2 remaining eval variants because it has absorbed the underlying company profile — not because it has learned to reason about ICP signals in general. Checkpoint selection on that signal selects the deepest memorizer. The fix is a probe-level split in `generate_full_training_data.py` (all variants of a probe stay on one side) combined with replacing the checkpoint callback in `train.py:207` with rubric score from `scoring_evaluator.py` against the true held-out set. The held-out set existed the entire time — the gap was a wiring failure, not a missing resource.
+
+**Grounding commit:** Rewrote the split logic in `training_data/generate_full_training_data.py` to operate at the probe level. Updated `train.py:207` to use `metric_for_best_model = "eval_rubric_score"` and `greater_is_better = True`, with the rubric callback logging under the exact key via `trainer.log()` inside `on_evaluate`. Added a caveat to `model_card.md` clarifying that the reported 0.0213 eval loss is variant-level and cannot be interpreted as generalization loss.
+
+---
+
+### Mikias as Explainer
+
+**Question received from Kemeriya:** In the ORPO training run documented in `submission_report.md` Section 7, signal-grounding preference pairs produced +11.8 pts while dual-control pairs produced −4.5 pts at the same β=0.2. Which of three hypotheses — gradient overshoot from β pressure, data sparsity in the 33 dual-control pairs, or early-stop artifact — is consistent with ORPO's gradient mechanics, and what would the loss curves look like under each?
+
+**Key points delivered:**
+
+- TRL's `ORPOTrainer` computes each sequence's log probability as a per-token average — it divides summed log-probs by sequence length T. This is correct design for handling variable-length sequences, but it creates a structural penalty when chosen and rejected differ at only one position.
+- Signal-grounding pairs have errors distributed across ~30 tokens in a 100-token response. After dividing by T, the preference gradient contribution is ~0.30. Dual-control pairs differ at exactly one terminal token — after dividing by T, the contribution is ~0.01, which falls below the optimizer's effective noise floor at standard learning rates.
+- The model receives no usable update from dual-control pairs. Small SFT-driven adjustments from other batch examples accumulate and produce the regression. More steps deepen it — the broken calculation doesn't converge, it compounds.
+- Neither overshoot nor early-stop explain the pattern. Overshoot would show rapid loss descent followed by instability; early-stop would show improvement that simply plateaus. Consistent regression from step 1 points to a zero-magnitude gradient, which is the dilution diagnosis.
+- β=0.2 does not help — β scales both sides of the loss proportionally and does not touch the 1/T denominator. The fix is structural: override the loss mask for terminal-error pairs so the denominator equals 1, then raise β to 0.5 and add gradient clipping at `max_norm=0.5` for the first ~200 steps.
+
+**Artifacts:** [pair_DAY_3/](pair_DAY_3/)
+
+---
+
 ## Repository Structure
 
 ```
@@ -98,9 +132,18 @@ week-12/
 │   ├── grounding_commit.md
 │   ├── sources.md
 │   └── thread.md
-└── pair_DAY_2/
-    ├── question.md               ← Mikias's retry logic question to Nahom
-    ├── explainer.md              ← Mikias's tool-selection explainer for Nahom
+├── pair_DAY_2/
+│   ├── question.md               ← Mikias's retry logic question to Nahom
+│   ├── explainer.md              ← Mikias's tool-selection explainer for Nahom
+│   ├── morning_call_summary.md
+│   ├── evening_call_summary.md
+│   ├── signoff.md
+│   ├── grounding_commit.md
+│   ├── sources.md
+│   └── thread.md
+└── pair_DAY_3/
+    ├── question.md               ← Mikias's eval corruption question to Kemeriya
+    ├── explainer.md              ← Mikias's ORPO averaging explainer for Kemeriya
     ├── morning_call_summary.md
     ├── evening_call_summary.md
     ├── signoff.md
