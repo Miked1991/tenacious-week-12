@@ -4,7 +4,7 @@
 |---|---|
 | **Program** | 10 Academy TRP1 |
 | **Week** | 12 |
-| **Dates** | May 5–7, 2026 |
+| **Dates** | May 5–8, 2026 |
 | **Participant** | Mikias Dagem |
 
 ---
@@ -118,6 +118,40 @@ Week 12 uses a structured peer-teaching format. Each day, two participants take 
 
 ---
 
+## Day 4 — Benchmark Scorer Integrity and LLM Judge Reliability
+
+| | |
+|---|---|
+| **Date** | May 8, 2026 |
+| **Partner** | Ephrata Wolde |
+| **Status** | Complete ✅ |
+
+### Mikias as Asker
+
+**Question:** In `scoring/scoring_evaluator.py` (Tenacious-Bench v0.1), the `score_dimension()` dispatcher falls through to return `1.0` for any dimension name it does not recognize — silently awarding full marks rather than raising an error or logging a warning. When a task JSONL contains a typo (e.g., `no_bench_words` instead of `no_bench_word`), the scorer returns a perfect score for that dimension with no indication the rubric key was unrecognized. Why does a silent permissive default in a string-keyed rubric dispatcher systematically inflate benchmark scores rather than introduce random noise, and what is the correct defensive pattern for a deterministic evaluator to guarantee that every task is scored against only its intended dimensions?
+
+**Gap closed:** The inflation is systematic, not random, because the fall-through always returns 1.0 and never 0.0 — every unrecognized key pulls the composite score up with no opposing pressure. This is not noise that averages out; it is a one-directional ceiling applied to every task containing a mismatched key, and the corruption is invisible in the score distribution. The correct defensive pattern has two layers: a `ValueError` guard inside `score_dimension()` that converts any unrecognized key into a loud failure, and a load-time validation pass that cross-checks every dimension key in the task JSONL against the registered scorer set before a single example is evaluated. The load-time check is the primary defense at scale; the in-function guard is a secondary backstop for any key that reaches the scorer through a path not gated by the load step.
+
+**Grounding commit:** Replaced the fall-through `return 1.0` in `score_dimension()` with an explicit `ValueError` listing the unrecognized key and registered alternatives. Added a load-time validation pass to `scoring/run_benchmark.py` that aborts the run at startup if any task JSONL key is unregistered. Added a caveat to `benchmark_results/tenacious_bench_v0.1.json` stating that the reported 81.4 mean rubric score was produced by the pre-fix dispatcher and cannot be confirmed as corruption-free until the benchmark is re-run.
+
+---
+
+### Mikias as Explainer
+
+**Question received from Ephrata Wolde:** My tenacious-bench uses an LLM as the judge to score model outputs. I report those scores as if they are reliable measurements, but I never tested whether the judge itself is consistent. What is inter-rater reliability, how do you measure whether an LLM judge is trustworthy, and what does an unreliable judge do to benchmark results?
+
+**Key points delivered:**
+
+- An LLM judge samples from a probability distribution over score tokens at inference time. At temperature > 0, two calls on identical input can return different scores. The score is a sample, not a measurement — its reliability depends on how concentrated that distribution is.
+- IRR has two components that must be diagnosed separately: intra-rater reliability (does the judge agree with itself across repeated calls?) and inter-rater reliability (does the judge agree with a reference standard?). A judge can pass the first and fail the second if its biases are systematic and consistent.
+- Unreliable judges produce systematic inflation, not random noise. Position bias and length bias are one-directional: a judge that favors the final-position response favors it every time, with no opposing case. There is no averaging-out. Studies find up to 30% systematic evaluation deviation from position effects alone.
+- The minimum viable validation protocol is three steps in order: (1) intra-rater stability on 50 examples, (2) Judge Sensitivity Score (JSS) across 10 prompt rephrasing variants — target ≥ 0.85, (3) Quadratic Weighted Kappa (QWK) against 30 human annotations — target ≥ 0.80 for any decision that depends on ranking.
+- Until those three pass, checkpoint selection on the scores picks the model that best exploits judge biases; cross-run comparisons conflate prompt drift with model improvement; and published numbers are not reproducible by anyone running a different judge.
+
+**Artifacts:** [pair_DAY_4/](pair_DAY_4/)
+
+---
+
 ## Repository Structure
 
 ```
@@ -141,9 +175,18 @@ week-12/
 │   ├── grounding_commit.md
 │   ├── sources.md
 │   └── thread.md
-└── pair_DAY_3/
-    ├── question.md               ← Mikias's eval corruption question to Kemeriya
-    ├── explainer.md              ← Mikias's ORPO averaging explainer for Kemeriya
+├── pair_DAY_3/
+│   ├── question.md               ← Mikias's eval corruption question to Kemeriya
+│   ├── explainer.md              ← Mikias's ORPO averaging explainer for Kemeriya
+│   ├── morning_call_summary.md
+│   ├── evening_call_summary.md
+│   ├── signoff.md
+│   ├── grounding_commit.md
+│   ├── sources.md
+│   └── thread.md
+└── pair_DAY_4/
+    ├── question.md               ← Mikias's scorer integrity question to Ephrata
+    ├── explainer.md              ← Mikias's LLM judge reliability explainer for Ephrata
     ├── morning_call_summary.md
     ├── evening_call_summary.md
     ├── signoff.md

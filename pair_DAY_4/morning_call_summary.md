@@ -1,0 +1,11 @@
+# Morning Call Summary — Pair Day 4
+
+**Pair:** Mikias Dagem & Ephrata Wolde
+**Written by:** Mikias Dagem
+**Date:** 2026-05-08
+
+---
+
+My question going in was too close to a bug report — something like "the scorer returns 1.0 on unrecognized keys, why is that bad?" Ephrata pushed back immediately: if the key is unrecognized, what does the function actually do? I said it falls through and returns 1.0. She asked: is that always bad, or only under specific conditions? That forced me to be precise. The problem isn't the 1.0 return in isolation — it's that the return is silent, the key mismatch leaves no trace in the logs, and the full weight of that dimension gets awarded to every output regardless of quality. Ephrata then pushed further: why does that produce systematic inflation rather than random noise? I didn't have a clean answer. That became the question. The original draft asked "what is the correct defensive pattern" but stopped short of asking why the failure mode is deterministically biased rather than randomly distributed. Adding that — making the mechanism, not just the fix, the target — made the question researchable rather than just practical.
+
+Ephrata's draft question was the inverse problem: she knew something was wrong with her evaluation setup but had framed it too broadly. Her working version was "how do I know if my LLM judge is reliable?" I asked her: reliable compared to what? She said she didn't know — she just wanted to report scores she could trust. That's two different questions: one is about internal consistency (does the judge agree with itself?) and one is about external validity (does the judge agree with the thing we actually care about?). Collapsing them into a single "is it reliable" question made both unanswerable in a single session. We separated them: first ask whether the judge is stable on repeated calls, then ask whether stable scores agree with a reference standard. I also pushed her to name the thing at stake — not "trustworthy scores" in the abstract, but the specific decisions her scores are driving. For Ephrata, that was checkpoint selection and leaderboard ranking on tenacious-bench. Naming those made the question concrete: what does an unreliable judge do specifically to selection decisions and to rankings? That's what we locked before the call ended.
